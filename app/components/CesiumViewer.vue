@@ -1,35 +1,8 @@
 <template>
-  <div class="relative w-full h-full">
-    <div class="flex gap-4 w-full h-full">
-      <div
-        ref="cesiumContainerRef"
-        class="flex-1 h-full cesium-viewer"
-      />
-      <div class="flex-1 h-full relative bg-muted rounded-lg overflow-hidden">
-        <div class="absolute top-2 right-2 z-10">
-          <UCard class="p-2">
-            <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-map" class="w-4 h-4 text-primary" />
-              <span class="text-sm font-medium">Street View</span>
-            </div>
-          </UCard>
-        </div>
-        <div
-          ref="streetViewContainerRef"
-          class="w-full h-full"
-        />
-        <div
-          v-if="streetViewError"
-          class="absolute inset-0 flex items-center justify-center bg-muted"
-        >
-          <div class="text-center p-4">
-            <UIcon name="i-lucide-alert-circle" class="w-8 h-8 text-muted mb-2 mx-auto" />
-            <p class="text-sm text-muted">{{ streetViewError }}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <div
+    ref="cesiumContainerRef"
+    class="flex-1 h-full cesium-viewer"
+  />
 </template>
 
 <script setup lang="ts">
@@ -46,11 +19,15 @@ interface Props {
   latitude: number
   height?: number // Height in meters
   is3DView?: boolean
+  streetViewHeading?: number // Street View heading in degrees (0-360)
+  streetViewPitch?: number // Street View pitch in degrees (-90 to 90)
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  height: 91.44, // Default: 300 feet (~91.44m)
-  is3DView: true
+  height: 150, // Default: 300 feet (~91.44m)
+  is3DView: true,
+  streetViewHeading: 0,
+  streetViewPitch: 0
 })
 
 const emit = defineEmits<{
@@ -59,52 +36,11 @@ const emit = defineEmits<{
 
 // Use template ref instead of ID to avoid hydration mismatches
 const cesiumContainerRef = ref<HTMLElement | null>(null)
-const streetViewContainerRef = ref<HTMLElement | null>(null)
-
-// Use Google Maps composable
-const { loadGoogleMapsAPI, error: googleMapsError } = useGoogleMaps()
-
-const streetViewError = computed(() => googleMapsError.value)
-let streetViewPanorama: any = null
-
-// Initialize Street View Panorama
-const initStreetView = async () => {
-  if (!streetViewContainerRef.value) return
-
-  try {
-    await loadGoogleMapsAPI()
-
-    if (!window.google || !window.google.maps) {
-      throw new Error('Google Maps API not available')
-    }
-
-    streetViewPanorama = new window.google.maps.StreetViewPanorama(
-      streetViewContainerRef.value,
-      {
-        position: { lat: props.latitude, lng: props.longitude },
-        pov: { heading: 0, pitch: 0 },
-        zoom: 1,
-        visible: true
-      }
-    )
-  } catch (error: any) {
-    console.error('Failed to initialize Street View:', error)
-  }
-}
-
-// Update Street View position
-const updateStreetViewPosition = () => {
-  if (streetViewPanorama && props.latitude && props.longitude) {
-    streetViewPanorama.setPosition({
-      lat: props.latitude,
-      lng: props.longitude
-    })
-  }
-}
 
 const config = useRuntimeConfig()
 let viewer: Cesium.Viewer | null = null
 let tileset: Cesium.Cesium3DTileset | null = null
+let viewConeEntity: Cesium.Entity | null = null
 
 // Load 3D buildings
 const loadBuildings = async () => {
@@ -219,12 +155,129 @@ const toggleViewMode = async (is3D: boolean) => {
 // Watch for prop changes and update viewer
 watch(() => [props.longitude, props.latitude, props.height], () => {
   flyToLocation()
-  updateStreetViewPosition()
+  updateViewCone()
 }, { deep: true })
 
 watch(() => props.is3DView, (newVal) => {
   toggleViewMode(newVal)
 })
+
+const updateViewCone = () => {
+  if (!viewer || props.streetViewHeading === undefined || props.streetViewPitch === undefined) {
+    return
+  }
+
+  const coneLength = 35
+  const halfFovRad = Cesium.Math.toRadians(30)
+  const terrainPos = Cesium.Cartographic.fromDegrees(props.longitude, props.latitude)
+  
+  Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, [terrainPos]).then((sampled) => {
+    if (!viewer || !sampled || sampled.length === 0) return
+    
+    const terrainHeight = sampled[0]?.height || 0
+    const streetLevelHeight = 0.5
+    const cameraHeight = terrainHeight + streetLevelHeight
+    
+    const cameraPosition = Cesium.Cartesian3.fromRadians(
+      sampled[0]!.longitude,
+      sampled[0]!.latitude,
+      cameraHeight
+    )
+    
+    const cesiumHeading = Cesium.Math.toRadians(props.streetViewHeading + 90)
+    const cesiumPitch = Cesium.Math.toRadians(-90)
+    
+    const hpr = new Cesium.HeadingPitchRoll(cesiumHeading, cesiumPitch, 0)
+    const orientation = Cesium.Transforms.headingPitchRollQuaternion(cameraPosition, hpr)
+    
+    const rotationMatrix = Cesium.Matrix3.fromQuaternion(orientation, new Cesium.Matrix3())
+    const forwardZ = Cesium.Matrix3.multiplyByVector(
+      rotationMatrix,
+      Cesium.Cartesian3.UNIT_Z,
+      new Cesium.Cartesian3()
+    )
+    
+    const offset = Cesium.Cartesian3.multiplyByScalar(forwardZ, -coneLength / 2, new Cesium.Cartesian3())
+    const conePosition = Cesium.Cartesian3.add(cameraPosition, offset, new Cesium.Cartesian3())
+    
+    const bottomRadius = coneLength * Math.tan(halfFovRad)
+    
+    if (viewConeEntity) {
+      try {
+        viewer.entities.remove(viewConeEntity)
+      } catch (e) {
+      }
+    }
+    
+    viewConeEntity = viewer.entities.add({
+      position: conePosition,
+      orientation: orientation,
+      cylinder: {
+        length: coneLength,
+        topRadius: 0,
+        bottomRadius: bottomRadius,
+        material: Cesium.Color.TEAL.withAlpha(0.6),
+        outline: true,
+        outlineColor: Cesium.Color.TEAL.withAlpha(1),
+        outlineWidth: 2.0
+      }
+    })
+  }).catch(() => {
+    if (!viewer) return
+    
+    const streetLevelHeight = 0.5
+    const cameraPosition = Cesium.Cartesian3.fromDegrees(
+      props.longitude,
+      props.latitude,
+      streetLevelHeight
+    )
+    
+    const cesiumHeading = Cesium.Math.toRadians(props.streetViewHeading + 90)
+    const cesiumPitch = Cesium.Math.toRadians(-90)
+    
+    const hpr = new Cesium.HeadingPitchRoll(cesiumHeading, cesiumPitch, 0)
+    const orientation = Cesium.Transforms.headingPitchRollQuaternion(cameraPosition, hpr)
+    
+    const rotationMatrix = Cesium.Matrix3.fromQuaternion(orientation, new Cesium.Matrix3())
+    const forwardZ = Cesium.Matrix3.multiplyByVector(
+      rotationMatrix,
+      Cesium.Cartesian3.UNIT_Z,
+      new Cesium.Cartesian3()
+    )
+    
+    const offset = Cesium.Cartesian3.multiplyByScalar(forwardZ, -coneLength / 2, new Cesium.Cartesian3())
+    const conePosition = Cesium.Cartesian3.add(cameraPosition, offset, new Cesium.Cartesian3())
+    
+    const halfFovRad = Cesium.Math.toRadians(90)
+    const bottomRadius = coneLength * Math.tan(halfFovRad)
+    
+    if (viewConeEntity) {
+      try {
+        viewer.entities.remove(viewConeEntity)
+      } catch (e) {
+      }
+    }
+    
+    viewConeEntity = viewer.entities.add({
+      position: conePosition,
+      orientation: orientation,
+      cylinder: {
+        length: coneLength,
+        topRadius: 0,
+        bottomRadius: bottomRadius,
+        material: Cesium.Color.TEAL.withAlpha(0.6),
+        outline: true,
+        outlineColor: Cesium.Color.TEAL.withAlpha(1),
+        outlineWidth: 2.0
+      }
+    })
+  })
+}
+
+// Watch for Street View POV changes
+watch(() => [props.streetViewHeading, props.streetViewPitch], () => {
+  updateViewCone()
+}, { deep: true })
 
 // Expose methods to parent
 defineExpose({
@@ -336,18 +389,20 @@ onMounted(async () => {
   })
 
   emit('viewerReady', viewer)
-
-  // Initialize Street View
-  await initStreetView()
+  
+  // Create initial view cone after viewer is ready
+  await nextTick()
+  updateViewCone()
 })
 
 onUnmounted(() => {
+  if (viewConeEntity && viewer) {
+    viewer.entities.remove(viewConeEntity)
+    viewConeEntity = null
+  }
   if (viewer) {
     viewer.destroy()
     viewer = null
-  }
-  if (streetViewPanorama) {
-    streetViewPanorama = null
   }
 })
 </script>

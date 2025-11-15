@@ -23,6 +23,8 @@ useSeoMeta({
   twitterImage: 'https://ui.nuxt.com/assets/templates/nuxt/starter-light.png',
   twitterCard: 'summary_large_image'
 })
+
+const { toggle: toggleLocationSlideover } = useLocationSlideover()
 </script>
 
 <template>
@@ -53,6 +55,14 @@ useSeoMeta({
       </template>
 
       <template #right>
+        <UButton
+          v-if="$route.path === '/explore'"
+          icon="i-lucide-settings"
+          variant="ghost"
+          color="neutral"
+          size="sm"
+          @click="toggleLocationSlideover"
+        />
         <UColorModeButton />
       </template>
     </UHeader>

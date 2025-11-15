@@ -13,6 +13,7 @@ declare global {
           }
         ) => {
           setPosition: (position: { lat: number; lng: number }) => void
+          setPov: (pov: { heading: number; pitch: number }) => void
         }
       }
     }
