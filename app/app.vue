@@ -11,8 +11,8 @@ useHead({
   }
 })
 
-const title = 'Nuxt Starter Template'
-const description = 'A production-ready starter template powered by Nuxt UI. Build beautiful, accessible, and performant applications in minutes, not hours.'
+const title = 'Neighbor - Neighborhood Analytics Platform'
+const description = 'Explore and analyze neighborhoods with powerful 3D visualization, demographic insights, and comprehensive neighborhood data.'
 
 useSeoMeta({
   title,
@@ -33,20 +33,27 @@ useSeoMeta({
           <AppLogo class="w-auto h-6 shrink-0" />
         </NuxtLink>
 
-        <TemplateMenu />
+        <UButton
+          to="/explore"
+          variant="ghost"
+          color="neutral"
+          size="sm"
+          class="ml-2"
+        >
+          Explore
+        </UButton>
+        <UButton
+          to="/analytics"
+          variant="ghost"
+          color="neutral"
+          size="sm"
+        >
+          Analytics
+        </UButton>
       </template>
 
       <template #right>
         <UColorModeButton />
-
-        <UButton
-          to="https://github.com/nuxt-ui-templates/starter"
-          target="_blank"
-          icon="i-simple-icons-github"
-          aria-label="GitHub"
-          color="neutral"
-          variant="ghost"
-        />
       </template>
     </UHeader>
 
@@ -54,24 +61,13 @@ useSeoMeta({
       <NuxtPage />
     </UMain>
 
-    <USeparator icon="i-simple-icons-nuxtdotjs" />
+    <USeparator />
 
     <UFooter>
       <template #left>
         <p class="text-sm text-muted">
-          Built with Nuxt UI • © {{ new Date().getFullYear() }}
+          Neighbor • Neighborhood Analytics Platform • © {{ new Date().getFullYear() }}
         </p>
-      </template>
-
-      <template #right>
-        <UButton
-          to="https://github.com/nuxt-ui-templates/starter"
-          target="_blank"
-          icon="i-simple-icons-github"
-          aria-label="GitHub"
-          color="neutral"
-          variant="ghost"
-        />
       </template>
     </UFooter>
   </UApp>

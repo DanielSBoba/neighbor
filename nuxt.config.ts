@@ -12,7 +12,8 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   routeRules: {
-    '/': { prerender: true }
+    '/': { prerender: true },
+    '/cesium': { ssr: false }
   },
 
   compatibilityDate: '2025-01-15',
@@ -23,6 +24,28 @@ export default defineNuxtConfig({
         commaDangle: 'never',
         braceStyle: '1tbs'
       }
+    }
+  },
+
+  vite: {
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            cesium: ['cesium']
+          }
+        }
+      }
+    },
+    optimizeDeps: {
+      include: ['cesium']
+    }
+  },
+
+  runtimeConfig: {
+    public: {
+      cesiumIonToken: process.env.CESIUM_ION_TOKEN || '',
+      googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || ''
     }
   }
 })

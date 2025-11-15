@@ -3,12 +3,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "nuxt build",
-    "dev": "nuxt dev",
+    "build": "node scripts/copy-cesium-assets.mjs && nuxt build",
+    "dev": "node scripts/copy-cesium-assets.mjs && nuxt dev",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt typecheck",
+    "copy-cesium": "node scripts/copy-cesium-assets.mjs"
   },
   "dependencies": {
     "3d-tiles-renderer": "^0.4.18",
