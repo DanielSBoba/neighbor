@@ -9,8 +9,13 @@
       class="absolute inset-0 flex items-center justify-center bg-muted"
     >
       <div class="text-center p-4">
-        <UIcon name="i-lucide-alert-circle" class="w-8 h-8 text-muted mb-2 mx-auto" />
-        <p class="text-sm text-muted">{{ streetViewError }}</p>
+        <UIcon
+          name="i-lucide-alert-circle"
+          class="w-8 h-8 text-muted mb-2 mx-auto"
+        />
+        <p class="text-sm text-muted">
+          {{ streetViewError }}
+        </p>
       </div>
     </div>
   </div>
@@ -53,7 +58,7 @@ const initStreetView = async () => {
     streetViewPanorama = new window.google.maps.StreetViewPanorama(
       streetViewContainerRef.value,
       {
-        
+
         position: { lat: props.latitude, lng: props.longitude },
         pov: { heading: 0, pitch: 0 },
         zoom: 1,
@@ -71,7 +76,7 @@ const initStreetView = async () => {
       if (position) {
         const lat = position.lat()
         const lng = position.lng()
-        
+
         // Only emit if position actually changed
         if (Math.abs(lat - props.latitude) > 0.0001 || Math.abs(lng - props.longitude) > 0.0001) {
           emit('positionChanged', lng, lat)
@@ -109,7 +114,7 @@ const updateStreetViewPosition = () => {
 
   try {
     isUpdatingFromProps = true
-    
+
     // Update Street View position
     streetViewPanorama.setPosition({
       lat: props.latitude,
@@ -137,6 +142,36 @@ watch(() => [props.longitude, props.latitude], () => {
   updateStreetViewPosition()
 }, { deep: true })
 
+// Capture screenshot using html2canvas or similar approach
+const captureScreenshot = async (): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    if (!streetViewContainerRef.value) {
+      reject(new Error('Street View not initialized'))
+      return
+    }
+
+    try {
+      // Find the Street View canvas
+      const canvas = streetViewContainerRef.value.querySelector('canvas') as HTMLCanvasElement
+      if (!canvas) {
+        reject(new Error('Street View canvas not found'))
+        return
+      }
+
+      // Convert canvas to data URL
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+      resolve(dataUrl)
+    } catch (error) {
+      reject(error)
+    }
+  })
+}
+
+// Expose methods to parent
+defineExpose({
+  captureScreenshot
+})
+
 onMounted(async () => {
   await nextTick()
   await initStreetView()
@@ -160,4 +195,3 @@ onUnmounted(() => {
   }
 })
 </script>
-

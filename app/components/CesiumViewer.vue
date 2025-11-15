@@ -41,11 +41,16 @@ const config = useRuntimeConfig()
 let viewer: Cesium.Viewer | null = null
 let tileset: Cesium.Cesium3DTileset | null = null
 let viewConeEntity: Cesium.Entity | null = null
+let targetPosition: Cesium.Cartesian3 | null = null
+let targetOrientation: Cesium.Quaternion | null = null
+let currentPosition: Cesium.Cartesian3 | null = null
+let currentOrientation: Cesium.Quaternion | null = null
+let animationStartTime: number | null = null
 
 // Load 3D buildings
 const loadBuildings = async () => {
   if (!viewer) return
-  
+
   try {
     tileset = await Cesium.Cesium3DTileset.fromIonAssetId(2275207)
     viewer.scene.primitives.add(tileset)
@@ -74,13 +79,13 @@ const removeBuildings = () => {
 // Expose methods to parent component
 const flyToLocation = (lon?: number, lat?: number, height?: number) => {
   if (!viewer) return
-  
+
   const targetLon = lon ?? props.longitude
   const targetLat = lat ?? props.latitude
   const targetHeight = height ?? props.height
-  
+
   if (!targetLon || !targetLat) return
-  
+
   // For 2D mode, use simpler positioning
   if (viewer.scene.mode === Cesium.SceneMode.SCENE2D) {
     viewer.camera.flyTo({
@@ -93,14 +98,14 @@ const flyToLocation = (lon?: number, lat?: number, height?: number) => {
     })
     return
   }
-  
+
   // For 3D mode, sample terrain for accurate height
   const terrainPos = Cesium.Cartographic.fromDegrees(targetLon, targetLat)
   Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, [terrainPos]).then((sampled) => {
     if (viewer && sampled && sampled.length > 0 && sampled[0]) {
       const terrainH = sampled[0].height || 0
       const cameraHeight = terrainH + targetHeight
-      
+
       viewer.camera.flyTo({
         destination: Cesium.Cartesian3.fromRadians(
           sampled[0].longitude,
@@ -136,7 +141,7 @@ const flyToLocation = (lon?: number, lat?: number, height?: number) => {
 
 const toggleViewMode = async (is3D: boolean) => {
   if (!viewer) return
-  
+
   if (is3D) {
     viewer.scene.mode = Cesium.SceneMode.SCENE3D
     viewer.terrainProvider = await Cesium.createWorldTerrainAsync()
@@ -148,7 +153,7 @@ const toggleViewMode = async (is3D: boolean) => {
     viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider()
     removeBuildings()
   }
-  
+
   flyToLocation()
 }
 
@@ -162,6 +167,35 @@ watch(() => props.is3DView, (newVal) => {
   toggleViewMode(newVal)
 })
 
+// Smooth rotation animation
+const animationDuration = 200 // 200ms
+
+const smoothPosition = new Cesium.CallbackPositionProperty((time, result) => {
+  if (!currentPosition || !targetPosition) return targetPosition || new Cesium.Cartesian3()
+
+  if (!animationStartTime) return targetPosition
+
+  const elapsed = Date.now() - animationStartTime
+  const t = Math.min(elapsed / animationDuration, 1)
+  // Ease out cubic
+  const eased = 1 - Math.pow(1 - t, 3)
+
+  return Cesium.Cartesian3.lerp(currentPosition, targetPosition, eased, result || new Cesium.Cartesian3())
+}, false, Cesium.ReferenceFrame.FIXED)
+
+const smoothOrientation = new Cesium.CallbackProperty(() => {
+  if (!currentOrientation || !targetOrientation) return targetOrientation || new Cesium.Quaternion()
+
+  if (!animationStartTime) return targetOrientation
+
+  const elapsed = Date.now() - animationStartTime
+  const t = Math.min(elapsed / animationDuration, 1)
+  // Ease out cubic
+  const eased = 1 - Math.pow(1 - t, 3)
+
+  return Cesium.Quaternion.slerp(currentOrientation, targetOrientation, eased, new Cesium.Quaternion())
+}, false)
+
 const updateViewCone = () => {
   if (!viewer || props.streetViewHeading === undefined || props.streetViewPitch === undefined) {
     return
@@ -170,107 +204,123 @@ const updateViewCone = () => {
   const coneLength = 35
   const halfFovRad = Cesium.Math.toRadians(30)
   const terrainPos = Cesium.Cartographic.fromDegrees(props.longitude, props.latitude)
-  
+
   Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, [terrainPos]).then((sampled) => {
     if (!viewer || !sampled || sampled.length === 0) return
-    
+
     const terrainHeight = sampled[0]?.height || 0
     const streetLevelHeight = 0.5
     const cameraHeight = terrainHeight + streetLevelHeight
-    
+
     const cameraPosition = Cesium.Cartesian3.fromRadians(
       sampled[0]!.longitude,
       sampled[0]!.latitude,
       cameraHeight
     )
-    
+
     const cesiumHeading = Cesium.Math.toRadians(props.streetViewHeading + 90)
     const cesiumPitch = Cesium.Math.toRadians(-90)
-    
+
     const hpr = new Cesium.HeadingPitchRoll(cesiumHeading, cesiumPitch, 0)
     const orientation = Cesium.Transforms.headingPitchRollQuaternion(cameraPosition, hpr)
-    
+
     const rotationMatrix = Cesium.Matrix3.fromQuaternion(orientation, new Cesium.Matrix3())
     const forwardZ = Cesium.Matrix3.multiplyByVector(
       rotationMatrix,
       Cesium.Cartesian3.UNIT_Z,
       new Cesium.Cartesian3()
     )
-    
+
     const offset = Cesium.Cartesian3.multiplyByScalar(forwardZ, -coneLength / 2, new Cesium.Cartesian3())
     const conePosition = Cesium.Cartesian3.add(cameraPosition, offset, new Cesium.Cartesian3())
-    
+
     const bottomRadius = coneLength * Math.tan(halfFovRad)
-    
-    if (viewConeEntity) {
-      try {
-        viewer.entities.remove(viewConeEntity)
-      } catch (e) {
-      }
+
+    // Create cone once, then just update target values for smooth animation
+    if (!viewConeEntity) {
+      currentPosition = conePosition.clone()
+      currentOrientation = orientation.clone()
+      targetPosition = conePosition.clone()
+      targetOrientation = orientation.clone()
+
+      viewConeEntity = viewer.entities.add({
+        position: smoothPosition,
+        orientation: smoothOrientation,
+        cylinder: {
+          length: coneLength,
+          topRadius: 0,
+          bottomRadius: bottomRadius,
+          material: Cesium.Color.TEAL.withAlpha(0.6),
+          outline: true,
+          outlineColor: Cesium.Color.TEAL.withAlpha(1),
+          outlineWidth: 2.0
+        }
+      })
+    } else {
+      // Update animation targets
+      currentPosition = targetPosition?.clone() || conePosition.clone()
+      currentOrientation = targetOrientation?.clone() || orientation.clone()
+      targetPosition = conePosition.clone()
+      targetOrientation = orientation.clone()
+      animationStartTime = Date.now()
     }
-    
-    viewConeEntity = viewer.entities.add({
-      position: conePosition,
-      orientation: orientation,
-      cylinder: {
-        length: coneLength,
-        topRadius: 0,
-        bottomRadius: bottomRadius,
-        material: Cesium.Color.TEAL.withAlpha(0.6),
-        outline: true,
-        outlineColor: Cesium.Color.TEAL.withAlpha(1),
-        outlineWidth: 2.0
-      }
-    })
   }).catch(() => {
     if (!viewer) return
-    
+
     const streetLevelHeight = 0.5
     const cameraPosition = Cesium.Cartesian3.fromDegrees(
       props.longitude,
       props.latitude,
       streetLevelHeight
     )
-    
+
     const cesiumHeading = Cesium.Math.toRadians(props.streetViewHeading + 90)
     const cesiumPitch = Cesium.Math.toRadians(-90)
-    
+
     const hpr = new Cesium.HeadingPitchRoll(cesiumHeading, cesiumPitch, 0)
     const orientation = Cesium.Transforms.headingPitchRollQuaternion(cameraPosition, hpr)
-    
+
     const rotationMatrix = Cesium.Matrix3.fromQuaternion(orientation, new Cesium.Matrix3())
     const forwardZ = Cesium.Matrix3.multiplyByVector(
       rotationMatrix,
       Cesium.Cartesian3.UNIT_Z,
       new Cesium.Cartesian3()
     )
-    
+
     const offset = Cesium.Cartesian3.multiplyByScalar(forwardZ, -coneLength / 2, new Cesium.Cartesian3())
     const conePosition = Cesium.Cartesian3.add(cameraPosition, offset, new Cesium.Cartesian3())
-    
+
     const halfFovRad = Cesium.Math.toRadians(90)
     const bottomRadius = coneLength * Math.tan(halfFovRad)
-    
-    if (viewConeEntity) {
-      try {
-        viewer.entities.remove(viewConeEntity)
-      } catch (e) {
-      }
+
+    // Create cone once, then just update target values for smooth animation
+    if (!viewConeEntity) {
+      currentPosition = conePosition.clone()
+      currentOrientation = orientation.clone()
+      targetPosition = conePosition.clone()
+      targetOrientation = orientation.clone()
+
+      viewConeEntity = viewer.entities.add({
+        position: smoothPosition,
+        orientation: smoothOrientation,
+        cylinder: {
+          length: coneLength,
+          topRadius: 0,
+          bottomRadius: bottomRadius,
+          material: Cesium.Color.TEAL.withAlpha(0.6),
+          outline: true,
+          outlineColor: Cesium.Color.TEAL.withAlpha(1),
+          outlineWidth: 2.0
+        }
+      })
+    } else {
+      // Update animation targets
+      currentPosition = targetPosition?.clone() || conePosition.clone()
+      currentOrientation = targetOrientation?.clone() || orientation.clone()
+      targetPosition = conePosition.clone()
+      targetOrientation = orientation.clone()
+      animationStartTime = Date.now()
     }
-    
-    viewConeEntity = viewer.entities.add({
-      position: conePosition,
-      orientation: orientation,
-      cylinder: {
-        length: coneLength,
-        topRadius: 0,
-        bottomRadius: bottomRadius,
-        material: Cesium.Color.TEAL.withAlpha(0.6),
-        outline: true,
-        outlineColor: Cesium.Color.TEAL.withAlpha(1),
-        outlineWidth: 2.0
-      }
-    })
   })
 }
 
@@ -279,23 +329,46 @@ watch(() => [props.streetViewHeading, props.streetViewPitch], () => {
   updateViewCone()
 }, { deep: true })
 
+// Capture screenshot
+const captureScreenshot = (): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    if (!viewer) {
+      reject(new Error('Viewer not initialized'))
+      return
+    }
+
+    try {
+      // Render the scene to ensure it's up to date
+      viewer.render()
+
+      // Get the canvas and convert to data URL
+      const canvas = viewer.scene.canvas as HTMLCanvasElement
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+      resolve(dataUrl)
+    } catch (error) {
+      reject(error)
+    }
+  })
+}
+
 // Expose methods to parent
 defineExpose({
   flyToLocation,
   toggleViewMode,
-  viewer
+  viewer,
+  captureScreenshot
 })
 
 onMounted(async () => {
   // Wait for DOM to be fully rendered before initializing Cesium
   await nextTick()
-  
+
   // Ensure the container element exists
   if (!cesiumContainerRef.value) {
     console.error('Cesium container element not found')
     return
   }
-  
+
   const ionToken = config.public.cesiumIonToken || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYWE1OWUxMy1jYmY3LTQ3Y2ItODVhMS1kODUxYjI4Y2IzYzciLCJpZCI6MjU5LCJpYXQiOjE0OTI5NjE1ODN9.7rGt8e3L3Z3v5hL8x5K9JvN5mK3vN5mK3vN5mK3vN5mK'
   Cesium.Ion.defaultAccessToken = ionToken
 
@@ -332,10 +405,10 @@ onMounted(async () => {
 
   viewer.scene.screenSpaceCameraController.minimumZoomDistance = 0.1
   viewer.scene.screenSpaceCameraController.maximumZoomDistance = 40480000.0
-  
+
   viewer.camera.frustum.near = 1.0
   viewer.camera.frustum.far = 100000000.0
-  
+
   viewer.scene.screenSpaceCameraController.enableCollisionDetection = true
   viewer.scene.screenSpaceCameraController.enableTilt = true
   viewer.scene.screenSpaceCameraController.enableRotate = true
@@ -368,13 +441,13 @@ onMounted(async () => {
     if (viewer && updatedPositions && updatedPositions.length > 0 && updatedPositions[0]) {
       const terrainHeight = updatedPositions[0].height || 0
       const cameraHeight = terrainHeight + props.height
-      
+
       const refinedPosition = Cesium.Cartesian3.fromRadians(
         updatedPositions[0].longitude,
         updatedPositions[0].latitude,
         cameraHeight
       )
-      
+
       viewer.camera.setView({
         destination: refinedPosition,
         orientation: {
@@ -389,7 +462,7 @@ onMounted(async () => {
   })
 
   emit('viewerReady', viewer)
-  
+
   // Create initial view cone after viewer is ready
   await nextTick()
   updateViewCone()
@@ -428,4 +501,3 @@ onUnmounted(() => {
   display: none !important;
 }
 </style>
-

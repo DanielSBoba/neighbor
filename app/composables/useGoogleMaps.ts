@@ -6,14 +6,14 @@ declare global {
         StreetViewPanorama: new (
           container: HTMLElement,
           opts: {
-            position: { lat: number; lng: number }
-            pov?: { heading: number; pitch: number }
+            position: { lat: number, lng: number }
+            pov?: { heading: number, pitch: number }
             zoom?: number
             visible?: boolean
           }
         ) => {
-          setPosition: (position: { lat: number; lng: number }) => void
-          setPov: (pov: { heading: number; pitch: number }) => void
+          setPosition: (position: { lat: number, lng: number }) => void
+          setPov: (pov: { heading: number, pitch: number }) => void
         }
       }
     }
@@ -95,4 +95,3 @@ export const useGoogleMaps = () => {
     error: readonly(error)
   }
 }
-

@@ -13,14 +13,18 @@
       <template #header>
         <div class="flex items-center justify-between w-full">
           <div>
-            <h2 class="text-highlighted font-semibold">Neighborhood Explorer</h2>
-            <p class="mt-1 text-muted text-sm">Adjust location coordinates, view height, and toggle 3D buildings view</p>
+            <h2 class="text-highlighted font-semibold">
+              Neighborhood Explorer
+            </h2>
+            <p class="mt-1 text-muted text-sm">
+              Adjust location coordinates, view height, and toggle 3D buildings view
+            </p>
           </div>
           <UButton
-            @click="resetView"
             color="neutral"
             variant="outline"
             icon="i-lucide-rotate-ccw"
+            @click="resetView"
           >
             Reset View
           </UButton>
@@ -54,6 +58,7 @@
       </div>
       <div class="flex-1 h-full rounded-lg border border-default overflow-hidden bg-default">
         <StreetView
+          ref="streetViewRef"
           :longitude="locationStore.longitude"
           :latitude="locationStore.latitude"
           @position-changed="handleStreetViewPositionChange"
@@ -61,11 +66,27 @@
         />
       </div>
     </div>
+    <!-- Animated Analyze Button -->
+    <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10">
+      <UButton
+        :loading="isAnalyzing"
+        :disabled="isAnalyzing"
+        size="xl"
+        color="primary"
+        variant="solid"
+        icon="i-lucide-sparkles"
+        class="animate-bounce hover:animate-none shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
+        @click="analyzeBuilding"
+      >
+        {{ isAnalyzing ? 'Analyzing...' : 'Analyze Building' }}
+      </UButton>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useLocationStore } from '../stores/location'
+import type { AnalyzeBuildingResponse } from '../../types/building-analysis'
 
 // Use location store
 const locationStore = useLocationStore()
@@ -73,13 +94,18 @@ const locationStore = useLocationStore()
 // Use composable for slideover state
 const { isOpen: isSlideoverOpen } = useLocationSlideover()
 
-const cesiumViewerRef = ref<any>(null)
+const cesiumViewerRef = ref<{ captureScreenshot: () => Promise<string> } | null>(null)
+const streetViewRef = ref<{ captureScreenshot: () => Promise<string> } | null>(null)
 
 // Track Street View POV (Point of View)
 const streetViewHeading = ref(0)
 const streetViewPitch = ref(0)
 
-const onViewerReady = (viewer: any) => {
+// Analysis state
+const isAnalyzing = ref(false)
+const toast = useToast()
+
+const onViewerReady = (_viewer: unknown) => {
   // Viewer is ready, can store reference if needed
 }
 
@@ -96,8 +122,76 @@ const handleStreetViewPovChange = (heading: number, pitch: number) => {
   streetViewPitch.value = pitch
 }
 
+const analyzeBuilding = async () => {
+  if (!cesiumViewerRef.value || !streetViewRef.value) {
+    toast.add({
+      title: 'Error',
+      description: 'Views not ready. Please wait and try again.',
+      color: 'error'
+    })
+    return
+  }
+
+  isAnalyzing.value = true
+
+  try {
+    // Capture screenshots from both views
+    const cesiumScreenshot = await cesiumViewerRef.value.captureScreenshot()
+    const streetViewScreenshot = await streetViewRef.value.captureScreenshot()
+
+    // Prepare the images array for the API
+    const images = [
+      { url: cesiumScreenshot, detail: 'high' },
+      { url: streetViewScreenshot, detail: 'high' }
+    ]
+
+    // Get current address (you might want to reverse geocode the coordinates)
+    const address = `${locationStore.latitude.toFixed(6)}, ${locationStore.longitude.toFixed(6)}`
+
+    // Call the API endpoint
+    const response = await $fetch<AnalyzeBuildingResponse>('/api/analyze-building', {
+      method: 'POST',
+      body: {
+        address,
+        images
+      }
+    })
+
+    if (response.success && response.data) {
+      toast.add({
+        title: 'Analysis Complete!',
+        description: `Building has ${response.data.combined_matrix.num_floors} floors and is ${response.data.combined_matrix.architectural_style.replace(/_/g, ' ')} style.`,
+        color: 'success'
+      })
+
+      // Log the full response for now
+      console.log('Building Analysis:', response.data)
+    } else {
+      throw new Error('No data received from analysis')
+    }
+  } catch (error: unknown) {
+    console.error('Analysis error:', error)
+
+    // Extract detailed error message
+    let errorMessage = 'Failed to analyze building. Please try again.'
+    if (error && typeof error === 'object' && 'data' in error) {
+      const errorData = error.data as { statusMessage?: string }
+      errorMessage = errorData.statusMessage || errorMessage
+    } else if (error instanceof Error) {
+      errorMessage = error.message
+    }
+
+    toast.add({
+      title: 'Analysis Failed',
+      description: errorMessage,
+      color: 'error'
+    })
+  } finally {
+    isAnalyzing.value = false
+  }
+}
+
 useHead({
   title: 'Explore Neighborhoods - Neighbor'
 })
 </script>
-

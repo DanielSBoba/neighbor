@@ -12,21 +12,20 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  runtimeConfig: {
+    openaiApiKey: process.env.OPENAI_API_KEY || '',
+    public: {
+      cesiumIonToken: process.env.CESIUM_ION_TOKEN || '',
+      googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || ''
+    }
+  },
+
   routeRules: {
     '/': { prerender: true },
     '/cesium': { ssr: false }
   },
 
   compatibilityDate: '2025-01-15',
-
-  eslint: {
-    config: {
-      stylistic: {
-        commaDangle: 'never',
-        braceStyle: '1tbs'
-      }
-    }
-  },
 
   vite: {
     build: {
@@ -43,10 +42,12 @@ export default defineNuxtConfig({
     }
   },
 
-  runtimeConfig: {
-    public: {
-      cesiumIonToken: process.env.CESIUM_ION_TOKEN || '',
-      googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || ''
+  eslint: {
+    config: {
+      stylistic: {
+        commaDangle: 'never',
+        braceStyle: '1tbs'
+      }
     }
   }
 })

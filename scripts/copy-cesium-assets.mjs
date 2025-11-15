@@ -47,4 +47,3 @@ for (const asset of assetsToCopy) {
   }
 }
 console.log('Cesium assets copied successfully!')
-

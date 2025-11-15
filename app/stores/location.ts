@@ -9,7 +9,7 @@ export const useLocationStore = defineStore('location', {
   }),
 
   getters: {
-    heightInMeters: (state) => state.heightInFeet * 0.3048
+    heightInMeters: state => state.heightInFeet * 0.3048
   },
 
   actions: {
@@ -42,4 +42,3 @@ export const useLocationStore = defineStore('location', {
     }
   }
 })
-
