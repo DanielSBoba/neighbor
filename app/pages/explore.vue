@@ -86,13 +86,14 @@
     <BuildingAnalysisSidebar
       v-model:open="isAnalysisSidebarOpen"
       :analysis="analysisData"
+      :osm-data="osmData"
     />
   </div>
 </template>
 
 <script setup lang="ts">
 import { useLocationStore } from '../stores/location'
-import type { AnalyzeBuildingResponse, BuildingAnalysis } from '../../types/building-analysis'
+import type { AnalyzeBuildingResponse } from '../../types/building-analysis'
 
 // Use location store
 const locationStore = useLocationStore()
@@ -109,8 +110,7 @@ const streetViewPitch = ref(0)
 
 // Analysis state
 const isAnalyzing = ref(false)
-const { isOpen: isAnalysisSidebarOpen, analysisData, setAnalysisData, open: openAnalysisSidebar } = useBuildingAnalysisSidebar()
-const toast = useToast()
+const { isOpen: isAnalysisSidebarOpen, analysisData, osmData, setAnalysisData, setOsmData, open: openAnalysisSidebar } = useBuildingAnalysisSidebar()
 
 const onViewerReady = (_viewer: unknown) => {
   // Viewer is ready, can store reference if needed
@@ -131,11 +131,7 @@ const handleStreetViewPovChange = (heading: number, pitch: number) => {
 
 const analyzeBuilding = async () => {
   if (!cesiumViewerRef.value || !streetViewRef.value) {
-    toast.add({
-      title: 'Error',
-      description: 'Views not ready. Please wait and try again.',
-      color: 'error'
-    })
+    console.error('Views not ready. Please wait and try again.')
     return
   }
 
@@ -152,50 +148,50 @@ const analyzeBuilding = async () => {
       { url: streetViewScreenshot, detail: 'high' }
     ]
 
-    // Get current address (you might want to reverse geocode the coordinates)
-    const address = `${locationStore.latitude.toFixed(6)}, ${locationStore.longitude.toFixed(6)}`
+    // Get current address using Google Geocoding API
+    const { reverseGeocode } = useGeocoding()
+    const address = await reverseGeocode(locationStore.latitude, locationStore.longitude)
+    console.log('Using address:', address)
 
-    // Call the API endpoint
-    const response = await $fetch<AnalyzeBuildingResponse>('/api/analyze-building', {
-      method: 'POST',
-      body: {
-        address,
-        images
-      }
-    })
-
-    if (response.success && response.data) {
-      // Store the analysis data using the composable
-      setAnalysisData(response.data.combined_matrix)
-
-      // Open the sidebar
-      openAnalysisSidebar()
-
-      toast.add({
-        title: 'Analysis Complete!',
-        description: `Building has ${response.data.combined_matrix.num_floors} floors and is ${response.data.combined_matrix.architectural_style.replace(/_/g, ' ')} style.`,
-        color: 'success'
+    // Call both endpoints in parallel
+    const [buildingResponse, osmResponse] = await Promise.all([
+      $fetch<AnalyzeBuildingResponse>('/api/analyze-building', {
+        method: 'POST',
+        body: {
+          address,
+          images
+        }
+      }),
+      $fetch('/api/fetch-osm-data', {
+        method: 'POST',
+        body: {
+          latitude: locationStore.latitude,
+          longitude: locationStore.longitude,
+          radius: 600
+        }
       })
+    ])
+
+    // Store building analysis data
+    if (buildingResponse.success && buildingResponse.data) {
+      setAnalysisData(buildingResponse.data.combined_matrix)
     } else {
-      throw new Error('No data received from analysis')
+      throw new Error('No data received from building analysis')
     }
+
+    // Store OSM data
+    if (osmResponse.success && osmResponse.data) {
+      setOsmData(osmResponse.data)
+      console.log('OSM data fetched:', osmResponse.data)
+    } else {
+      console.warn('Failed to fetch OSM data, but continuing with analysis')
+      setOsmData(null)
+    }
+
+    // Open the sidebar
+    openAnalysisSidebar()
   } catch (error: unknown) {
     console.error('Analysis error:', error)
-
-    // Extract detailed error message
-    let errorMessage = 'Failed to analyze building. Please try again.'
-    if (error && typeof error === 'object' && 'data' in error) {
-      const errorData = error.data as { statusMessage?: string }
-      errorMessage = errorData.statusMessage || errorMessage
-    } else if (error instanceof Error) {
-      errorMessage = error.message
-    }
-
-    toast.add({
-      title: 'Analysis Failed',
-      description: errorMessage,
-      color: 'error'
-    })
   } finally {
     isAnalyzing.value = false
   }

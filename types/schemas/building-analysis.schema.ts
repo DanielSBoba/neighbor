@@ -108,3 +108,4 @@ export const analyzeBuildingResponseSchema = z.object({
     total_tokens: z.number()
   }).optional()
 })
+

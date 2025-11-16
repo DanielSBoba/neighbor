@@ -12,29 +12,31 @@
             Building Analysis
           </h2>
           <p class="mt-1 text-sm text-muted">
-            AI-powered architectural analysis
+            AI-powered architectural analysis and neighborhood context
           </p>
         </div>
       </div>
     </template>
 
     <template #body>
-      <div v-if="analysis" class="divide-y divide-default p-0">
-        <!-- Address Section -->
-        <div class="p-6 bg-primary/5">
-          <div class="flex items-start gap-3">
-            <UIcon name="i-lucide-map-pin" class="w-5 h-5 text-primary mt-0.5" />
-            <div class="flex-1">
-              <h3 class="text-sm font-medium text-muted">
-                Address
-              </h3>
-              <p class="mt-1 text-base font-medium text-highlighted">
-                {{ analysis.address }}
-              </p>
-            </div>
+      <!-- Address Section - Above Tabs -->
+      <div v-if="analysis" class="p-6 bg-primary/5 border-b border-default">
+        <div class="flex items-start gap-3">
+          <UIcon name="i-lucide-map-pin" class="w-5 h-5 text-primary mt-0.5" />
+          <div class="flex-1">
+            <h3 class="text-sm font-medium text-muted">
+              Address
+            </h3>
+            <p class="mt-1 text-base font-medium text-highlighted">
+              {{ analysis.address }}
+            </p>
           </div>
         </div>
+      </div>
 
+      <UTabs v-model:selected="selectedTab" :items="tabs" class="w-full">
+        <template #building>
+          <div v-if="analysis" class="divide-y divide-default p-0">
         <!-- Quick Stats Grid -->
         <div class="grid grid-cols-2 gap-4 p-6 bg-default">
           <div class="flex flex-col gap-1">
@@ -206,18 +208,192 @@
           </div>
         </div>
       </div>
+        </template>
+
+        <template #context>
+          <div class="p-0">
+            <div v-if="osmData" class="divide-y divide-default">
+              <!-- Location Info -->
+              <div class="p-6 bg-primary/5">
+                <div class="flex items-start gap-3">
+                  <UIcon name="i-lucide-map" class="w-5 h-5 text-primary mt-0.5" />
+                  <div class="flex-1">
+                    <h3 class="text-sm font-medium text-muted">Location</h3>
+                    <p class="mt-1 text-sm text-highlighted">{{ osmData.location.display_name || 'Unknown location' }}</p>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                      <UBadge v-if="osmData.location.city" color="primary" variant="subtle" size="sm">
+                        {{ osmData.location.city }}
+                      </UBadge>
+                      <UBadge v-if="osmData.location.state" color="neutral" variant="subtle" size="sm">
+                        {{ osmData.location.state }}
+                      </UBadge>
+                      <UBadge v-if="osmData.location.postcode" color="neutral" variant="subtle" size="sm">
+                        {{ osmData.location.postcode }}
+                      </UBadge>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Nearby Amenities -->
+              <div v-if="osmData.highlights.subway_stations.length > 0" class="p-6">
+                <div class="flex items-start gap-3">
+                  <UIcon name="i-lucide-train" class="w-5 h-5 text-primary mt-0.5" />
+                  <div class="flex-1">
+                    <h3 class="text-sm font-medium text-muted mb-3">Subway Stations</h3>
+                    <div class="space-y-2">
+                      <div
+                        v-for="(station, idx) in osmData.highlights.subway_stations.slice(0, 5)"
+                        :key="idx"
+                        class="flex items-center justify-between text-sm"
+                      >
+                        <span class="text-highlighted">{{ station.name }}</span>
+                        <span v-if="station.distance_m" class="text-muted">{{ formatDistance(station.distance_m) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="osmData.highlights.bus_stops.length > 0" class="p-6 bg-default">
+                <div class="flex items-start gap-3">
+                  <UIcon name="i-lucide-bus" class="w-5 h-5 text-primary mt-0.5" />
+                  <div class="flex-1">
+                    <h3 class="text-sm font-medium text-muted mb-3">Bus Stops</h3>
+                    <div class="space-y-2">
+                      <div
+                        v-for="(stop, idx) in osmData.highlights.bus_stops.slice(0, 5)"
+                        :key="idx"
+                        class="flex items-center justify-between text-sm"
+                      >
+                        <span class="text-highlighted">{{ stop.name }}</span>
+                        <span v-if="stop.distance_m" class="text-muted">{{ formatDistance(stop.distance_m) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="osmData.highlights.schools.length > 0" class="p-6">
+                <div class="flex items-start gap-3">
+                  <UIcon name="i-lucide-school" class="w-5 h-5 text-primary mt-0.5" />
+                  <div class="flex-1">
+                    <h3 class="text-sm font-medium text-muted mb-3">Schools</h3>
+                    <div class="space-y-2">
+                      <div
+                        v-for="(school, idx) in osmData.highlights.schools.slice(0, 5)"
+                        :key="idx"
+                        class="flex items-center justify-between text-sm"
+                      >
+                        <span class="text-highlighted">{{ school.name }}</span>
+                        <span v-if="school.distance_m" class="text-muted">{{ formatDistance(school.distance_m) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="osmData.highlights.groceries.length > 0" class="p-6 bg-default">
+                <div class="flex items-start gap-3">
+                  <UIcon name="i-lucide-shopping-cart" class="w-5 h-5 text-primary mt-0.5" />
+                  <div class="flex-1">
+                    <h3 class="text-sm font-medium text-muted mb-3">Groceries & Markets</h3>
+                    <div class="space-y-2">
+                      <div
+                        v-for="(grocery, idx) in osmData.highlights.groceries.slice(0, 5)"
+                        :key="idx"
+                        class="flex items-center justify-between text-sm"
+                      >
+                        <span class="text-highlighted">{{ grocery.name }}</span>
+                        <span v-if="grocery.distance_m" class="text-muted">{{ formatDistance(grocery.distance_m) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="osmData.highlights.parks.length > 0" class="p-6">
+                <div class="flex items-start gap-3">
+                  <UIcon name="i-lucide-trees" class="w-5 h-5 text-primary mt-0.5" />
+                  <div class="flex-1">
+                    <h3 class="text-sm font-medium text-muted mb-3">Parks & Recreation</h3>
+                    <div class="space-y-2">
+                      <div
+                        v-for="(park, idx) in osmData.highlights.parks.slice(0, 5)"
+                        :key="idx"
+                        class="flex items-center justify-between text-sm"
+                      >
+                        <span class="text-highlighted">{{ park.name }}</span>
+                        <span v-if="park.distance_m" class="text-muted">{{ formatDistance(park.distance_m) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="osmData.highlights.churches.length > 0" class="p-6 bg-default">
+                <div class="flex items-start gap-3">
+                  <UIcon name="i-lucide-church" class="w-5 h-5 text-primary mt-0.5" />
+                  <div class="flex-1">
+                    <h3 class="text-sm font-medium text-muted mb-3">Places of Worship</h3>
+                    <div class="space-y-2">
+                      <div
+                        v-for="(church, idx) in osmData.highlights.churches.slice(0, 5)"
+                        :key="idx"
+                        class="flex items-center justify-between text-sm"
+                      >
+                        <span class="text-highlighted">{{ church.name }}</span>
+                        <span v-if="church.distance_m" class="text-muted">{{ formatDistance(church.distance_m) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-else class="p-6 text-center text-muted">
+              <p>No context data available</p>
+            </div>
+          </div>
+        </template>
+      </UTabs>
     </template>
   </USlideover>
 </template>
 
 <script setup lang="ts">
 import type { BuildingAnalysis } from '../../types/building-analysis'
+import type { OSMData } from '../../types/osm-data'
 
 const props = defineProps<{
   analysis: BuildingAnalysis | null
+  osmData: OSMData | null
 }>()
 
 const isOpen = defineModel<boolean>('open', { default: false })
+
+// Tab management
+const selectedTab = ref(0)
+const tabs = [
+  {
+    label: 'Building',
+    slot: 'building',
+    icon: 'i-lucide-building-2'
+  },
+  {
+    label: 'Context',
+    slot: 'context',
+    icon: 'i-lucide-map-pin'
+  }
+]
+
+// Format distance
+const formatDistance = (meters: number): string => {
+  if (meters < 1000) {
+    return `${Math.round(meters)}m`
+  }
+  return `${(meters / 1000).toFixed(1)}km`
+}
 
 // Sort facade materials by percentage (descending)
 const sortedFacadeMaterials = computed(() => {

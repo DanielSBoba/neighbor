@@ -9,7 +9,7 @@ import type {
   buildingAnalysisSchema,
   buildingAnalysisResponseSchema,
   analyzeBuildingResponseSchema
-} from './building-analysis.schema'
+} from './schemas/building-analysis.schema'
 
 // Export types inferred from Zod schemas
 export type ArchitecturalStyle = z.infer<typeof architecturalStyleSchema>

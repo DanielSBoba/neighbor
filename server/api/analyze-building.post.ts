@@ -1,5 +1,5 @@
 import OpenAI from 'openai'
-import { buildingAnalysisResponseSchema } from '../../types/building-analysis.schema'
+import { buildingAnalysisResponseSchema } from '../../types/schemas/building-analysis.schema'
 
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
@@ -22,6 +22,8 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const { address = 'TBD', images = [] } = body
 
+  console.log('Received address:', address)
+
   if (!images || images.length === 0) {
     throw createError({
       statusCode: 400,
@@ -30,14 +32,20 @@ export default defineEventHandler(async (event) => {
   }
 
   // Build the reference schema text
-  const schemaText = `All of these images describe the address ${address} - the first image is the top-down view, the next images are of the street view. Based on these images, tell me the # floors, window-to-wall ratio, architectural style, estimated building age, % mix of facade materials, and % mix of program. Output each one of these categories into a combined matrix JSON based on the attached reference:
+  const schemaText = `All of these images describe the building located at: ${address}
+
+The first image is the top-down view, the next images are of the street view. Based on these images, tell me the # floors, window-to-wall ratio, architectural style, estimated building age, % mix of facade materials, and % mix of program.
+
+IMPORTANT: You MUST use "${address}" as the address field in your response. Do not try to determine the address from the images.
+
+Output each one of these categories into a combined matrix JSON based on the attached reference:
 
 {
   "version": "1.1",
   "description": "Reference format for building analysis outputs from images.",
   "schema": {
     "combined_matrix": {
-      "address": "string. Full street address if known, otherwise 'unknown' or 'TBD'.",
+      "address": "string. Use the exact address provided above: ${address}",
       "num_floors": "integer. Total number of above-grade floors estimated from the images.",
       "window_to_wall_ratio": "number between 0 and 1. Estimated ratio of glazed area to total facade area.",
       "architectural_style": "string. Must be one of: 'prewar_masonry', 'art_deco', 'modernist', 'brutalist', 'postmodern', 'postwar_commercial', 'contemporary_glass', 'industrial_loft', 'townhouse_rowhouse', 'vernacular_other', 'unknown'. Choose the closest fit.",

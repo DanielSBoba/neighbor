@@ -15,6 +15,15 @@ declare global {
           setPosition: (position: { lat: number, lng: number }) => void
           setPov: (pov: { heading: number, pitch: number }) => void
         }
+        Geocoder: new () => {
+          geocode: (
+            request: { location: { lat: number, lng: number } },
+            callback: (results: Array<{ formatted_address: string }> | null, status: string) => void
+          ) => void
+        }
+        GeocoderStatus: {
+          OK: string
+        }
       }
     }
   }
