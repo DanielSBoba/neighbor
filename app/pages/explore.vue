@@ -66,23 +66,7 @@
         />
       </div>
     </div>
-    <!-- Animated Analyze Button -->
-    <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10">
-      <UButton
-        :loading="isAnalyzing"
-        :disabled="isAnalyzing"
-        size="xl"
-        color="primary"
-        variant="solid"
-        icon="i-lucide-sparkles"
-        class="animate-bounce hover:animate-none shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
-        @click="analyzeBuilding"
-      >
-        {{ isAnalyzing ? 'Analyzing...' : 'Analyze' }}
-      </UButton>
-    </div>
-
-    <!-- Building Analysis Sidebar -->
+    <!-- Building Analysis Drawer (from bottom) -->
     <BuildingAnalysisSidebar
       v-model:open="isAnalysisSidebarOpen"
       :analysis="analysisData"
@@ -108,8 +92,8 @@ const streetViewRef = ref<{ captureScreenshot: () => Promise<string> } | null>(n
 const streetViewHeading = ref(0)
 const streetViewPitch = ref(0)
 
-// Analysis state
-const isAnalyzing = ref(false)
+// Analysis state - use shared state from app.vue
+const isAnalyzing = useState('is-analyzing', () => false)
 const { isOpen: isAnalysisSidebarOpen, analysisData, osmData, setAnalysisData, setOsmData, open: openAnalysisSidebar } = useBuildingAnalysisSidebar()
 
 const onViewerReady = (_viewer: unknown) => {
@@ -199,5 +183,18 @@ const analyzeBuilding = async () => {
 
 useHead({
   title: 'Explore Neighborhoods - Neighbor'
+})
+
+// Listen for analyze trigger from navbar
+onMounted(() => {
+  if (process.client) {
+    window.addEventListener('trigger-analyze', analyzeBuilding)
+  }
+})
+
+onUnmounted(() => {
+  if (process.client) {
+    window.removeEventListener('trigger-analyze', analyzeBuilding)
+  }
 })
 </script>

@@ -26,6 +26,17 @@ useSeoMeta({
 
 const { toggle: toggleAnalysisSidebar, isOpen: isAnalysisSidebarOpen, analysisData } = useBuildingAnalysisSidebar()
 const { toggle: toggleLocationSlideover, isOpen: isLocationSlideoverOpen } = useLocationSlideover()
+
+// State for analyze functionality
+const isAnalyzing = useState('is-analyzing', () => false)
+
+// Event bus for triggering analysis from navbar
+const analyzeBuilding = () => {
+  // Emit event that explore page will listen to
+  if (process.client) {
+    window.dispatchEvent(new CustomEvent('trigger-analyze'))
+  }
+}
 </script>
 
 <template>
@@ -56,6 +67,18 @@ const { toggle: toggleLocationSlideover, isOpen: isLocationSlideoverOpen } = use
       </template>
 
       <template #right>
+        <UButton
+          v-if="$route.path === '/explore'"
+          :loading="isAnalyzing"
+          :disabled="isAnalyzing"
+          color="primary"
+          variant="solid"
+          icon="i-lucide-sparkles"
+          size="sm"
+          @click="analyzeBuilding"
+        >
+          {{ isAnalyzing ? 'Analyzing...' : 'Analyze' }}
+        </UButton>
         <UButton
           v-if="$route.path === '/explore'"
           :icon="isLocationSlideoverOpen ? 'i-lucide-x' : 'i-lucide-settings'"
