@@ -24,12 +24,13 @@ useSeoMeta({
   twitterCard: 'summary_large_image'
 })
 
-const { toggle: toggleLocationSlideover } = useLocationSlideover()
+const { toggle: toggleAnalysisSidebar, isOpen: isAnalysisSidebarOpen, analysisData } = useBuildingAnalysisSidebar()
+const { toggle: toggleLocationSlideover, isOpen: isLocationSlideoverOpen } = useLocationSlideover()
 </script>
 
 <template>
   <UApp>
-    <UHeader>
+    <UHeader :toggle="false">
       <template #left>
         <NuxtLink to="/">
           <AppLogo class="w-auto h-6 shrink-0" />
@@ -57,11 +58,19 @@ const { toggle: toggleLocationSlideover } = useLocationSlideover()
       <template #right>
         <UButton
           v-if="$route.path === '/explore'"
-          icon="i-lucide-settings"
+          :icon="isLocationSlideoverOpen ? 'i-lucide-x' : 'i-lucide-settings'"
           variant="ghost"
           color="neutral"
           size="sm"
           @click="toggleLocationSlideover"
+        />
+        <UButton
+          v-if="$route.path === '/explore' && analysisData"
+          :icon="isAnalysisSidebarOpen ? 'i-lucide-x' : 'i-lucide-menu'"
+          variant="ghost"
+          color="neutral"
+          size="sm"
+          @click="toggleAnalysisSidebar"
         />
         <UColorModeButton />
       </template>
@@ -70,15 +79,5 @@ const { toggle: toggleLocationSlideover } = useLocationSlideover()
     <UMain>
       <NuxtPage />
     </UMain>
-
-    <USeparator />
-
-    <UFooter>
-      <template #left>
-        <p class="text-sm text-muted">
-          Neighbor • Neighborhood Analytics Platform • © {{ new Date().getFullYear() }}
-        </p>
-      </template>
-    </UFooter>
   </UApp>
 </template>

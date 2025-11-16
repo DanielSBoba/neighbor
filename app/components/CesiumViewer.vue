@@ -24,7 +24,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  height: 150, // Default: 300 feet (~91.44m)
+  height: 122, // Default: 400 feet (~121.92m)
   is3DView: true,
   streetViewHeading: 0,
   streetViewPitch: 0

@@ -1,19 +1,16 @@
 <template>
   <div>
     <UPageHero
-      title="Nuxt Starter Template"
-      description="A production-ready starter template powered by Nuxt UI. Build beautiful, accessible, and performant applications in minutes, not hours."
+      title="Neighbor"
+      description="Explore and analyze neighborhoods with powerful 3D visualization, comprehensive building insights, and real-time street views. Make informed decisions about your next location."
       :links="[{
-        label: 'Get started',
-        to: 'https://ui.nuxt.com/docs/getting-started/installation/nuxt',
-        target: '_blank',
+        label: 'Start Exploring',
+        to: '/explore',
         trailingIcon: 'i-lucide-arrow-right',
         size: 'xl'
       }, {
-        label: 'Use this template',
-        to: 'https://github.com/nuxt-ui-templates/starter',
-        target: '_blank',
-        icon: 'i-simple-icons-github',
+        label: 'View Analytics',
+        to: '/analytics',
         size: 'xl',
         color: 'neutral',
         variant: 'subtle'
@@ -22,53 +19,45 @@
 
     <UPageSection
       id="features"
-      title="Everything you need to build modern Nuxt apps"
-      description="Start with a solid foundation. This template includes all the essentials for building production-ready applications with Nuxt UI's powerful component system."
+      title="Everything you need to explore neighborhoods"
+      description="Neighbor combines cutting-edge 3D mapping technology with comprehensive building analysis to help you understand any neighborhood in detail."
       :features="[{
-        icon: 'i-lucide-rocket',
-        title: 'Production-ready from day one',
-        description: 'Pre-configured with TypeScript, ESLint, Tailwind CSS, and all the best practices. Focus on building features, not setting up tooling.'
+        icon: 'i-lucide-globe',
+        title: '3D Interactive Maps',
+        description: 'Navigate neighborhoods with stunning 3D visualization powered by Cesium. Explore terrain, buildings, and landmarks in immersive detail.'
       }, {
-        icon: 'i-lucide-palette',
-        title: 'Beautiful by default',
-        description: 'Leveraging Nuxt UI\'s design system with automatic dark mode, consistent spacing, and polished components that look great out of the box.'
+        icon: 'i-lucide-building-2',
+        title: 'Building Analysis',
+        description: 'Click any building to get instant insights including height, area, construction details, and comprehensive property information.'
       }, {
-        icon: 'i-lucide-zap',
-        title: 'Lightning fast',
-        description: 'Optimized for performance with SSR/SSG support, automatic code splitting, and edge-ready deployment. Your users will love the speed.'
+        icon: 'i-lucide-camera',
+        title: 'Street View Integration',
+        description: 'Seamlessly switch to Google Street View to see real photos of any location. Get a true feel for the neighborhood at ground level.'
       }, {
-        icon: 'i-lucide-blocks',
-        title: '100+ components included',
-        description: 'Access Nuxt UI\'s comprehensive component library. From forms to navigation, everything is accessible, responsive, and customizable.'
+        icon: 'i-lucide-map-pin',
+        title: 'Location Search',
+        description: 'Quickly find any address or place. Jump to neighborhoods, buildings, and points of interest with powerful search capabilities.'
       }, {
-        icon: 'i-lucide-code-2',
-        title: 'Developer experience first',
-        description: 'Auto-imports, hot module replacement, and TypeScript support. Write less boilerplate and ship more features.'
+        icon: 'i-lucide-layers',
+        title: 'Rich Data Layers',
+        description: 'Overlay demographic data, zoning information, and neighborhood statistics. See the complete picture of any area.'
       }, {
-        icon: 'i-lucide-shield-check',
-        title: 'Built for scale',
-        description: 'Enterprise-ready architecture with proper error handling, SEO optimization, and security best practices built-in.'
+        icon: 'i-lucide-bar-chart-3',
+        title: 'Analytics Dashboard',
+        description: 'Access detailed analytics and trends for neighborhoods. Compare areas and track changes over time with powerful visualizations.'
       }]"
     />
 
     <UPageSection>
       <UPageCTA
-        title="Ready to build your next Nuxt app?"
-        description="Join thousands of developers building with Nuxt and Nuxt UI. Get this template and start shipping today."
+        title="Ready to explore your neighborhood?"
+        description="Discover insights about your current neighborhood or find your next perfect location with Neighbor's powerful analytics platform."
         variant="subtle"
         :links="[{
-          label: 'Start building',
-          to: 'https://ui.nuxt.com/docs/getting-started/installation/nuxt',
-          target: '_blank',
-          trailingIcon: 'i-lucide-arrow-right',
+          label: 'Launch Explorer',
+          to: '/explore',
+          trailingIcon: 'i-lucide-map',
           color: 'neutral'
-        }, {
-          label: 'View on GitHub',
-          to: 'https://github.com/nuxt-ui-templates/starter',
-          target: '_blank',
-          icon: 'i-simple-icons-github',
-          color: 'neutral',
-          variant: 'outline'
         }]"
       />
     </UPageSection>

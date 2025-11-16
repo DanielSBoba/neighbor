@@ -50,7 +50,7 @@
         </div>
       </div>
       <p class="text-xs text-muted mt-1">
-        Default: 300 ft - Top-down view
+        Default: 400 ft - Top-down view
       </p>
     </div>
   </div>

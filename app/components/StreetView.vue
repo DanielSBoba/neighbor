@@ -142,29 +142,56 @@ watch(() => [props.longitude, props.latitude], () => {
   updateStreetViewPosition()
 }, { deep: true })
 
-// Capture screenshot using html2canvas or similar approach
+// Capture screenshot using Google Static Street View API
 const captureScreenshot = async (): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    if (!streetViewContainerRef.value) {
-      reject(new Error('Street View not initialized'))
-      return
+  if (!streetViewPanorama) {
+    throw new Error('Street View not initialized')
+  }
+
+  try {
+    // Get current position and POV
+    const position = streetViewPanorama.getPosition()
+    const pov = streetViewPanorama.getPov()
+    
+    if (!position) {
+      throw new Error('Street View position not available')
     }
 
-    try {
-      // Find the Street View canvas
-      const canvas = streetViewContainerRef.value.querySelector('canvas') as HTMLCanvasElement
-      if (!canvas) {
-        reject(new Error('Street View canvas not found'))
-        return
-      }
+    const lat = position.lat()
+    const lng = position.lng()
+    const heading = Math.round(pov.heading)
+    const pitch = Math.round(pov.pitch)
+    const fov = 90 // Field of view
 
-      // Convert canvas to data URL
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
-      resolve(dataUrl)
-    } catch (error) {
-      reject(error)
+    // Get Google Maps API key from runtime config
+    const config = useRuntimeConfig()
+    const apiKey = config.public.googleMapsApiKey
+
+    if (!apiKey) {
+      throw new Error('Google Maps API key not configured')
     }
-  })
+
+    // Build Static Street View API URL
+    const size = '800x600'
+    const url = `https://maps.googleapis.com/maps/api/streetview?size=${size}&location=${lat},${lng}&heading=${heading}&pitch=${pitch}&fov=${fov}&key=${apiKey}`
+
+    // Fetch the image and convert to base64
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error('Failed to fetch Street View image')
+    }
+
+    const blob = await response.blob()
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+  } catch (error) {
+    console.error('Failed to capture Street View screenshot:', error)
+    throw error
+  }
 }
 
 // Expose methods to parent

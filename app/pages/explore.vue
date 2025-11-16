@@ -78,15 +78,21 @@
         class="animate-bounce hover:animate-none shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
         @click="analyzeBuilding"
       >
-        {{ isAnalyzing ? 'Analyzing...' : 'Analyze Building' }}
+        {{ isAnalyzing ? 'Analyzing...' : 'Analyze' }}
       </UButton>
     </div>
+
+    <!-- Building Analysis Sidebar -->
+    <BuildingAnalysisSidebar
+      v-model:open="isAnalysisSidebarOpen"
+      :analysis="analysisData"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { useLocationStore } from '../stores/location'
-import type { AnalyzeBuildingResponse } from '../../types/building-analysis'
+import type { AnalyzeBuildingResponse, BuildingAnalysis } from '../../types/building-analysis'
 
 // Use location store
 const locationStore = useLocationStore()
@@ -103,6 +109,7 @@ const streetViewPitch = ref(0)
 
 // Analysis state
 const isAnalyzing = ref(false)
+const { isOpen: isAnalysisSidebarOpen, analysisData, setAnalysisData, open: openAnalysisSidebar } = useBuildingAnalysisSidebar()
 const toast = useToast()
 
 const onViewerReady = (_viewer: unknown) => {
@@ -139,7 +146,7 @@ const analyzeBuilding = async () => {
     const cesiumScreenshot = await cesiumViewerRef.value.captureScreenshot()
     const streetViewScreenshot = await streetViewRef.value.captureScreenshot()
 
-    // Prepare the images array for the API
+    // Prepare the images array for the API (sending both screenshots)
     const images = [
       { url: cesiumScreenshot, detail: 'high' },
       { url: streetViewScreenshot, detail: 'high' }
@@ -158,14 +165,17 @@ const analyzeBuilding = async () => {
     })
 
     if (response.success && response.data) {
+      // Store the analysis data using the composable
+      setAnalysisData(response.data.combined_matrix)
+
+      // Open the sidebar
+      openAnalysisSidebar()
+
       toast.add({
         title: 'Analysis Complete!',
         description: `Building has ${response.data.combined_matrix.num_floors} floors and is ${response.data.combined_matrix.architectural_style.replace(/_/g, ' ')} style.`,
         color: 'success'
       })
-
-      // Log the full response for now
-      console.log('Building Analysis:', response.data)
     } else {
       throw new Error('No data received from analysis')
     }

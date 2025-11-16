@@ -4,7 +4,7 @@ export const useLocationStore = defineStore('location', {
   state: () => ({
     longitude: -73.9553126,
     latitude: 40.7200922,
-    heightInFeet: 300,
+    heightInFeet: 400,
     is3DView: true
   }),
 
@@ -37,7 +37,7 @@ export const useLocationStore = defineStore('location', {
     resetView() {
       this.longitude = -73.9553126
       this.latitude = 40.7200922
-      this.heightInFeet = 300
+      this.heightInFeet = 400
       this.is3DView = true
     }
   }
