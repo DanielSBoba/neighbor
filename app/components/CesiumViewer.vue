@@ -1,13 +1,24 @@
 <template>
-  <div
-    ref="cesiumContainerRef"
-    class="flex-1 h-full cesium-viewer"
-  />
+  <div class="relative flex-1 h-full">
+    <div
+      ref="cesiumContainerRef"
+      class="flex-1 h-full cesium-viewer"
+    />
+    <POITooltip
+      :poi="selectedPOI"
+      :category="selectedCategory"
+      :color="selectedColor"
+      :position="tooltipPosition"
+      :is-visible="showTooltip"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
 import * as Cesium from 'cesium'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
+import type { OSMData, POIItem } from '../../types/osm-data'
+import { getPOIColor, formatPOICategoryName } from '../utils/poi-colors'
 
 // Set Cesium base URL for assets
 if (typeof window !== 'undefined') {
@@ -21,13 +32,15 @@ interface Props {
   is3DView?: boolean
   streetViewHeading?: number // Street View heading in degrees (0-360)
   streetViewPitch?: number // Street View pitch in degrees (-90 to 90)
+  osmData?: OSMData | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
   height: 122, // Default: 400 feet (~121.92m)
   is3DView: true,
   streetViewHeading: 0,
-  streetViewPitch: 0
+  streetViewPitch: 0,
+  osmData: null
 })
 
 const emit = defineEmits<{
@@ -46,6 +59,14 @@ let targetOrientation: Cesium.Quaternion | null = null
 let currentPosition: Cesium.Cartesian3 | null = null
 let currentOrientation: Cesium.Quaternion | null = null
 let animationStartTime: number | null = null
+const poiEntities: Cesium.Entity[] = []
+
+// Tooltip state
+const showTooltip = ref(false)
+const selectedPOI = ref<POIItem | null>(null)
+const selectedCategory = ref('')
+const selectedColor = ref('')
+const tooltipPosition = ref({ x: 0, y: 0 })
 
 // Load 3D buildings
 const loadBuildings = async () => {
@@ -329,6 +350,185 @@ watch(() => [props.streetViewHeading, props.streetViewPitch], () => {
   updateViewCone()
 }, { deep: true })
 
+// Get Cesium color from hex color
+const getCesiumColor = (category: string): Cesium.Color => {
+  const hexColor = getPOIColor(category)
+  return Cesium.Color.fromCssColorString(hexColor)
+}
+
+// Create colored POI pin using the poi.svg file
+const createColoredPinSVG = (color: string): string => {
+  // Enhanced SVG with proper drop shadow and color
+  const svgString = `
+    <svg width="800" height="800" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+      <defs>
+        <filter id="shadow-${color.replace('#', '')}" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+          <feOffset dx="0" dy="2" result="offsetblur"/>
+          <feComponentTransfer>
+            <feFuncA type="linear" slope="0.4"/>
+          </feComponentTransfer>
+          <feMerge>
+            <feMergeNode/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+        <linearGradient id="gradient-${color.replace('#', '')}" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style="stop-color:${color};stop-opacity:1" />
+          <stop offset="100%" style="stop-color:${color};stop-opacity:0.85" />
+        </linearGradient>
+      </defs>
+      <g filter="url(#shadow-${color.replace('#', '')})">
+        <path d="M50.002 0C30.763 0 15 15.718 15 34.902c0 7.432 2.374 14.34 6.392 20.019L45.73 96.994c3.409 4.453 5.675 3.607 8.51-.235l26.843-45.683c.542-.981.967-2.026 1.338-3.092A34.446 34.446 0 0 0 85 34.902C85 15.718 69.24 0 50.002 0zm0 16.354c10.359 0 18.597 8.218 18.597 18.548c0 10.33-8.238 18.544-18.597 18.544c-10.36 0-18.601-8.215-18.601-18.544c0-10.33 8.241-18.548 18.6-18.548z" 
+              fill="url(#gradient-${color.replace('#', '')})" 
+              stroke="white" 
+              stroke-width="3"/>
+      </g>
+    </svg>
+  `
+  return `data:image/svg+xml;base64,${btoa(svgString)}`
+}
+
+// Clear all POI markers
+const clearPOIMarkers = () => {
+  if (!viewer) return
+  
+  for (const entity of poiEntities) {
+    viewer.entities.remove(entity)
+  }
+  poiEntities.length = 0
+}
+
+// Add POI markers to the map
+const addPOIMarkers = () => {
+  if (!viewer || !props.osmData) return
+  
+  clearPOIMarkers()
+  
+  const categories = [
+    { key: 'subway_stations', items: props.osmData.highlights.subway_stations },
+    { key: 'bus_stops', items: props.osmData.highlights.bus_stops },
+    { key: 'schools', items: props.osmData.highlights.schools },
+    { key: 'groceries', items: props.osmData.highlights.groceries },
+    { key: 'parks', items: props.osmData.highlights.parks },
+    { key: 'churches', items: props.osmData.highlights.churches }
+  ]
+  
+  for (const category of categories) {
+    const colorHex = getPOIColor(category.key)
+    const categoryName = formatPOICategoryName(category.key)
+    
+    for (const poi of category.items) {
+      if (!poi.geolocation) continue
+      
+      const position = Cesium.Cartesian3.fromDegrees(
+        poi.geolocation.lng,
+        poi.geolocation.lat,
+        5 // Add 5 meters height to ensure visibility above ground
+      )
+      
+      // Use colored SVG pin for maximum quality
+      const svgPin = createColoredPinSVG(colorHex)
+      
+      const entity = viewer.entities.add({
+        position,
+        billboard: {
+          image: svgPin,
+          width: 40,
+          height: 40,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          scale: 1.0,
+          pixelOffset: new Cesium.Cartesian2(0, 0),
+          scaleByDistance: new Cesium.NearFarScalar(100, 1.2, 5000, 0.5)
+        },
+        properties: {
+          poiData: poi,
+          categoryKey: category.key,
+          categoryName: categoryName,
+          color: colorHex
+        }
+      })
+      
+      poiEntities.push(entity)
+    }
+  }
+  
+  // Set up click handler for POI markers
+  setupClickHandler()
+}
+
+// Set up click handler for POI entities
+let clickHandler: Cesium.ScreenSpaceEventHandler | null = null
+
+const setupClickHandler = () => {
+  if (!viewer) return
+  
+  // Remove old handler if exists
+  if (clickHandler) {
+    clickHandler.destroy()
+  }
+  
+  clickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas)
+  
+  // Handle left click
+  clickHandler.setInputAction((click: any) => {
+    const pickedObject = viewer!.scene.pick(click.position)
+    
+    if (Cesium.defined(pickedObject) && pickedObject.id && pickedObject.id.properties) {
+      const entity = pickedObject.id
+      const props = entity.properties
+      
+      // Check if this is a POI entity
+      if (props.poiData && props.categoryName && props.color) {
+        const poiData = props.poiData.getValue()
+        const categoryName = props.categoryName.getValue()
+        const color = props.color.getValue()
+        
+        // Update tooltip data
+        selectedPOI.value = poiData
+        selectedCategory.value = categoryName
+        selectedColor.value = color
+        
+        // Calculate screen position for tooltip
+        const cartesian = entity.position.getValue(Cesium.JulianDate.now())
+        if (cartesian) {
+          const canvasPosition = Cesium.SceneTransforms.worldToWindowCoordinates(
+            viewer!.scene,
+            cartesian
+          )
+          
+          if (canvasPosition) {
+            tooltipPosition.value = {
+              x: canvasPosition.x,
+              y: canvasPosition.y - 50 // Offset above the marker
+            }
+          }
+        }
+        
+        showTooltip.value = true
+      } else {
+        // Clicked on something else, hide tooltip
+        showTooltip.value = false
+      }
+    } else {
+      // Clicked on empty space, hide tooltip
+      showTooltip.value = false
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK)
+  
+  // Hide tooltip on camera move
+  viewer.camera.moveStart.addEventListener(() => {
+    showTooltip.value = false
+  })
+}
+
+// Watch for osmData changes
+watch(() => props.osmData, () => {
+  addPOIMarkers()
+}, { deep: true })
+
 // Capture screenshot
 const captureScreenshot = (): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -376,9 +576,9 @@ onMounted(async () => {
     baseLayerPicker: false,
     geocoder: true,
     homeButton: true,
-    infoBox: true,
+    infoBox: false, // Disabled - using custom Vue tooltip instead
     sceneModePicker: true,
-    selectionIndicator: true,
+    selectionIndicator: false, // Disabled for cleaner look
     timeline: false,
     navigationHelpButton: true,
     animation: false,
@@ -466,13 +666,25 @@ onMounted(async () => {
   // Create initial view cone after viewer is ready
   await nextTick()
   updateViewCone()
+  
+  // Add POI markers if data is already available
+  addPOIMarkers()
 })
 
 onUnmounted(() => {
+  clearPOIMarkers()
+  
+  // Clean up click handler
+  if (clickHandler) {
+    clickHandler.destroy()
+    clickHandler = null
+  }
+  
   if (viewConeEntity && viewer) {
     viewer.entities.remove(viewConeEntity)
     viewConeEntity = null
   }
+  
   if (viewer) {
     viewer.destroy()
     viewer = null

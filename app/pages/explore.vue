@@ -53,6 +53,7 @@
           :is3-d-view="locationStore.is3DView"
           :street-view-heading="streetViewHeading"
           :street-view-pitch="streetViewPitch"
+          :osm-data="osmData"
           @viewer-ready="onViewerReady"
         />
       </div>
