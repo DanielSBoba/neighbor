@@ -97,6 +97,11 @@ const removeBuildings = () => {
   tileset = null
 }
 
+// Reset to home position (initial street view coordinates with look-down view)
+const resetToHome = () => {
+  flyToLocation(props.longitude, props.latitude, props.height)
+}
+
 // Expose methods to parent component
 const flyToLocation = (lon?: number, lat?: number, height?: number) => {
   if (!viewer) return
@@ -356,37 +361,45 @@ const getCesiumColor = (category: string): Cesium.Color => {
   return Cesium.Color.fromCssColorString(hexColor)
 }
 
-// Create colored POI pin using the poi.svg file
-const createColoredPinSVG = (color: string): string => {
-  // Enhanced SVG with proper drop shadow and color
-  const svgString = `
-    <svg width="800" height="800" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-      <defs>
-        <filter id="shadow-${color.replace('#', '')}" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
-          <feOffset dx="0" dy="2" result="offsetblur"/>
-          <feComponentTransfer>
-            <feFuncA type="linear" slope="0.4"/>
-          </feComponentTransfer>
-          <feMerge>
-            <feMergeNode/>
-            <feMergeNode in="SourceGraphic"/>
-          </feMerge>
-        </filter>
-        <linearGradient id="gradient-${color.replace('#', '')}" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" style="stop-color:${color};stop-opacity:1" />
-          <stop offset="100%" style="stop-color:${color};stop-opacity:0.85" />
-        </linearGradient>
-      </defs>
-      <g filter="url(#shadow-${color.replace('#', '')})">
-        <path d="M50.002 0C30.763 0 15 15.718 15 34.902c0 7.432 2.374 14.34 6.392 20.019L45.73 96.994c3.409 4.453 5.675 3.607 8.51-.235l26.843-45.683c.542-.981.967-2.026 1.338-3.092A34.446 34.446 0 0 0 85 34.902C85 15.718 69.24 0 50.002 0zm0 16.354c10.359 0 18.597 8.218 18.597 18.548c0 10.33-8.238 18.544-18.597 18.544c-10.36 0-18.601-8.215-18.601-18.544c0-10.33 8.241-18.548 18.6-18.548z" 
-              fill="url(#gradient-${color.replace('#', '')})" 
-              stroke="white" 
-              stroke-width="3"/>
-      </g>
-    </svg>
-  `
-  return `data:image/svg+xml;base64,${btoa(svgString)}`
+// Create colored POI pin using canvas for high-resolution rendering
+const createColoredPinCanvas = (color: string): HTMLCanvasElement => {
+  // Render at 4x resolution for crisp display
+  const size = 160 // 40 * 4 for retina displays
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  
+  // Scale factor for the SVG path coordinates
+  const scale = size / 100
+  
+  // Create gradient
+  const gradient = ctx.createLinearGradient(0, 0, 0, size)
+  gradient.addColorStop(0, color)
+  gradient.addColorStop(1, color + 'D9') // 85% opacity
+  
+  // Apply shadow
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)'
+  ctx.shadowBlur = 8
+  ctx.shadowOffsetX = 0
+  ctx.shadowOffsetY = 3
+  
+  // Draw white stroke first
+  ctx.strokeStyle = 'white'
+  ctx.lineWidth = 5 * scale / 20
+  ctx.fillStyle = gradient
+  
+  // Draw the pin path (scaled)
+  ctx.save()
+  ctx.scale(scale, scale)
+  
+  const path = new Path2D('M50.002 0C30.763 0 15 15.718 15 34.902c0 7.432 2.374 14.34 6.392 20.019L45.73 96.994c3.409 4.453 5.675 3.607 8.51-.235l26.843-45.683c.542-.981.967-2.026 1.338-3.092A34.446 34.446 0 0 0 85 34.902C85 15.718 69.24 0 50.002 0zm0 16.354c10.359 0 18.597 8.218 18.597 18.548c0 10.33-8.238 18.544-18.597 18.544c-10.36 0-18.601-8.215-18.601-18.544c0-10.33 8.241-18.548 18.6-18.548z')
+  
+  ctx.stroke(path)
+  ctx.fill(path)
+  ctx.restore()
+  
+  return canvas
 }
 
 // Clear all POI markers
@@ -427,19 +440,17 @@ const addPOIMarkers = () => {
         5 // Add 5 meters height to ensure visibility above ground
       )
       
-      // Use colored SVG pin for maximum quality
-      const svgPin = createColoredPinSVG(colorHex)
+      // Use high-resolution canvas for crisp rendering
+      const pinCanvas = createColoredPinCanvas(colorHex)
       
       const entity = viewer.entities.add({
         position,
         billboard: {
-          image: svgPin,
-          width: 40,
-          height: 40,
+          image: pinCanvas,
+          scale: 0.25, // Canvas is 160x160, scale to 40x40
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
-          scale: 1.0,
           pixelOffset: new Cesium.Cartesian2(0, 0),
           scaleByDistance: new Cesium.NearFarScalar(100, 1.2, 5000, 0.5)
         },
@@ -555,6 +566,7 @@ const captureScreenshot = (): Promise<string> => {
 defineExpose({
   flyToLocation,
   toggleViewMode,
+  resetToHome,
   viewer,
   captureScreenshot
 })
@@ -582,8 +594,12 @@ onMounted(async () => {
     timeline: false,
     navigationHelpButton: true,
     animation: false,
-    creditContainer: document.createElement('div')
+    creditContainer: document.createElement('div'),
+    msaaSamples: 4 // Enable 4x multi-sample anti-aliasing for smoother edges
   })
+
+  // Set resolution scale to match device pixel ratio for crisp rendering on high-DPI displays
+  viewer.resolutionScale = window.devicePixelRatio || 1.0
 
   // Set initial camera position
   const initialPosition = Cesium.Cartesian3.fromDegrees(props.longitude, props.latitude, props.height)
@@ -614,6 +630,9 @@ onMounted(async () => {
   viewer.scene.screenSpaceCameraController.enableRotate = true
   viewer.scene.screenSpaceCameraController.enableTranslate = true
   viewer.scene.screenSpaceCameraController.enableZoom = true
+
+  // Enable FXAA for additional anti-aliasing
+  viewer.scene.postProcessStages.fxaa.enabled = true
 
   // Load buildings if 3D view is enabled
   if (props.is3DView) {

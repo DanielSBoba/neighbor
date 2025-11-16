@@ -37,6 +37,13 @@ const analyzeBuilding = () => {
     window.dispatchEvent(new CustomEvent('trigger-analyze'))
   }
 }
+
+// Event bus for triggering home reset from navbar
+const resetToHome = () => {
+  if (process.client) {
+    window.dispatchEvent(new CustomEvent('trigger-home-reset'))
+  }
+}
 </script>
 
 <template>
@@ -79,6 +86,14 @@ const analyzeBuilding = () => {
         >
           {{ isAnalyzing ? 'Analyzing...' : 'Analyze' }}
         </UButton>
+        <UButton
+          v-if="$route.path === '/explore'"
+          icon="i-lucide-home"
+          variant="ghost"
+          color="neutral"
+          size="sm"
+          @click="resetToHome"
+        />
         <UButton
           v-if="$route.path === '/explore'"
           :icon="isLocationSlideoverOpen ? 'i-lucide-x' : 'i-lucide-settings'"

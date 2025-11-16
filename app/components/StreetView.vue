@@ -42,7 +42,10 @@ const streetViewError = computed(() => googleMapsError.value)
 let streetViewPanorama: any = null
 let positionChangedListener: any = null
 let povChangedListener: any = null
+let panoChangedListener: any = null
 let isUpdatingFromProps = false
+let isRestoringPov = false
+let lastKnownPov: { heading: number, pitch: number } | null = null
 
 // Initialize Street View Panorama
 const initStreetView = async () => {
@@ -66,39 +69,54 @@ const initStreetView = async () => {
       }
     )
 
-    // Listen for position changes when user navigates in Street View
+    // Restore saved heading when panorama changes (e.g., clicking navigation arrows)
+    panoChangedListener = streetViewPanorama.addListener('pano_changed', () => {
+      if (isUpdatingFromProps || !lastKnownPov) return
+
+      isRestoringPov = true
+      const savedPov = { ...lastKnownPov }
+
+      // Restore POV immediately and on next frame to handle async rendering
+      streetViewPanorama.setPov(savedPov)
+      requestAnimationFrame(() => {
+        if (streetViewPanorama) {
+          streetViewPanorama.setPov(savedPov)
+          isRestoringPov = false
+        }
+      })
+    })
+
+    // Emit position changes when user navigates in Street View
     positionChangedListener = streetViewPanorama.addListener('position_changed', () => {
-      if (isUpdatingFromProps) {
-        return
-      }
+      if (isUpdatingFromProps) return
 
       const position = streetViewPanorama.getPosition()
-      if (position) {
-        const lat = position.lat()
-        const lng = position.lng()
+      if (!position) return
 
-        // Only emit if position actually changed
-        if (Math.abs(lat - props.latitude) > 0.0001 || Math.abs(lng - props.longitude) > 0.0001) {
-          emit('positionChanged', lng, lat)
-        }
+      const lat = position.lat()
+      const lng = position.lng()
+
+      // Only emit if position actually changed
+      if (Math.abs(lat - props.latitude) > 0.0001 || Math.abs(lng - props.longitude) > 0.0001) {
+        emit('positionChanged', lng, lat)
       }
     })
 
-    // Listen for POV (heading/pitch) changes
+    // Track and emit POV (heading/pitch) changes
     povChangedListener = streetViewPanorama.addListener('pov_changed', () => {
-      if (isUpdatingFromProps) {
-        return
-      }
+      if (isUpdatingFromProps || isRestoringPov) return
 
       const pov = streetViewPanorama.getPov()
-      if (pov) {
-        emit('povChanged', pov.heading, pov.pitch)
-      }
+      if (!pov) return
+
+      lastKnownPov = { heading: pov.heading, pitch: pov.pitch }
+      emit('povChanged', pov.heading, pov.pitch)
     })
 
     // Emit initial POV
     const initialPov = streetViewPanorama.getPov()
     if (initialPov) {
+      lastKnownPov = { heading: initialPov.heading, pitch: initialPov.pitch }
       emit('povChanged', initialPov.heading, initialPov.pitch)
     }
   } catch (error: any) {
@@ -106,35 +124,23 @@ const initStreetView = async () => {
   }
 }
 
-// Update Street View position
+// Update Street View position when props change
 const updateStreetViewPosition = () => {
-  if (!streetViewPanorama || !props.latitude || !props.longitude) {
-    return
-  }
+  if (!streetViewPanorama || !props.latitude || !props.longitude) return
 
-  try {
-    isUpdatingFromProps = true
+  isUpdatingFromProps = true
+  
+  streetViewPanorama.setPosition({
+    lat: props.latitude,
+    lng: props.longitude
+  })
 
-    // Update Street View position
-    streetViewPanorama.setPosition({
-      lat: props.latitude,
-      lng: props.longitude
-    })
+  // Preserve current POV instead of resetting to default
+  // (removed setPov call)
 
-    // Also update the POV to face north (optional, can be adjusted)
-    streetViewPanorama.setPov({
-      heading: 0,
-      pitch: 0
-    })
-
-    // Reset flag after a short delay to allow position_changed event to fire
-    setTimeout(() => {
-      isUpdatingFromProps = false
-    }, 100)
-  } catch (error) {
-    console.warn('Failed to update Street View position:', error)
+  setTimeout(() => {
     isUpdatingFromProps = false
-  }
+  }, 100)
 }
 
 // Watch for location changes
@@ -205,20 +211,15 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  if (positionChangedListener) {
-    if (typeof positionChangedListener.remove === 'function') {
-      positionChangedListener.remove()
+  // Clean up event listeners
+  const listeners = [positionChangedListener, povChangedListener, panoChangedListener]
+  listeners.forEach(listener => {
+    if (listener && typeof listener.remove === 'function') {
+      listener.remove()
     }
-    positionChangedListener = null
-  }
-  if (povChangedListener) {
-    if (typeof povChangedListener.remove === 'function') {
-      povChangedListener.remove()
-    }
-    povChangedListener = null
-  }
-  if (streetViewPanorama) {
-    streetViewPanorama = null
-  }
+  })
+
+  // Clear references
+  streetViewPanorama = null
 })
 </script>

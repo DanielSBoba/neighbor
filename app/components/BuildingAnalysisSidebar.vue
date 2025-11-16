@@ -202,52 +202,36 @@
               <!-- Nearby Amenities using Accordion -->
               <UAccordion
                 :items="amenityAccordionItems"
-                :default-open="true"
-                multiple
+                type="multiple"
               >
-                <template #item="{ item, open }">
-                  <UButton
-                    color="neutral"
-                    variant="ghost"
-                    class="w-full p-3"
-                  >
-                    <template #leading>
-                      <div class="flex items-center gap-3">
-                        <span 
-                          class="w-3 h-3 rounded-full flex-shrink-0 ring-2 ring-white shadow-sm" 
-                          :style="{ backgroundColor: item.color }" 
-                        />
-                        <UIcon :name="item.icon" class="w-5 h-5" />
-                      </div>
-                    </template>
+                <template #leading="{ item }">
+                  <UIcon 
+                    :name="item.icon" 
+                    class="w-5 h-5" 
+                    :style="{ color: item.color }"
+                  />
+                </template>
 
-                    <span class="truncate text-sm font-medium">{{ item.label }}</span>
-
-                    <template #trailing>
-                      <div class="flex items-center gap-2">
-                        <UBadge size="xs" color="neutral" variant="subtle">
-                          {{ item.content.split(' ')[0] }}
-                        </UBadge>
-                        <UIcon
-                          name="i-lucide-chevron-down"
-                          class="w-5 h-5 transition-transform duration-200"
-                          :class="[open && 'transform rotate-180']"
-                        />
-                      </div>
-                    </template>
-                  </UButton>
+                <template #trailing="{ item, open }">
+                  <div class="flex items-center gap-2">
+                    <UBadge size="xs" color="neutral" variant="subtle">
+                      {{ item.count }}
+                    </UBadge>
+                    <UIcon
+                      name="i-lucide-chevron-down"
+                      class="w-5 h-5 transition-transform duration-200"
+                      :class="[open && 'transform rotate-180']"
+                    />
+                  </div>
                 </template>
                 <template #subway_stations>
                   <div class="space-y-1 pb-2">
                     <div
                       v-for="(station, idx) in osmData.highlights.subway_stations.slice(0, 10)"
                       :key="idx"
-                      class="flex items-center justify-between text-xs py-1"
+                      class="flex items-center justify-between text-xs py-1 px-2"
                     >
-                      <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full flex-shrink-0" :style="{ backgroundColor: getPOIColor('subway_stations') }" />
-                        <span class="text-highlighted">{{ station.name }}</span>
-                      </div>
+                      <span class="text-highlighted">{{ station.name }}</span>
                       <span v-if="station.distance_m" class="text-muted">{{ formatDistanceInFeet(station.distance_m) }}</span>
                     </div>
                   </div>
@@ -258,12 +242,9 @@
                     <div
                       v-for="(stop, idx) in osmData.highlights.bus_stops.slice(0, 10)"
                       :key="idx"
-                      class="flex items-center justify-between text-xs py-1"
+                      class="flex items-center justify-between text-xs py-1 px-2"
                     >
-                      <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full flex-shrink-0" :style="{ backgroundColor: getPOIColor('bus_stops') }" />
-                        <span class="text-highlighted">{{ stop.name }}</span>
-                      </div>
+                      <span class="text-highlighted">{{ stop.name }}</span>
                       <span v-if="stop.distance_m" class="text-muted">{{ formatDistanceInFeet(stop.distance_m) }}</span>
                     </div>
                   </div>
@@ -274,12 +255,9 @@
                     <div
                       v-for="(school, idx) in osmData.highlights.schools.slice(0, 10)"
                       :key="idx"
-                      class="flex items-center justify-between text-xs py-1"
+                      class="flex items-center justify-between text-xs py-1 px-2"
                     >
-                      <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full flex-shrink-0" :style="{ backgroundColor: getPOIColor('schools') }" />
-                        <span class="text-highlighted">{{ school.name }}</span>
-                      </div>
+                      <span class="text-highlighted">{{ school.name }}</span>
                       <span v-if="school.distance_m" class="text-muted">{{ formatDistanceInFeet(school.distance_m) }}</span>
                     </div>
                   </div>
@@ -290,12 +268,9 @@
                     <div
                       v-for="(grocery, idx) in osmData.highlights.groceries.slice(0, 10)"
                       :key="idx"
-                      class="flex items-center justify-between text-xs py-1"
+                      class="flex items-center justify-between text-xs py-1 px-2"
                     >
-                      <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full flex-shrink-0" :style="{ backgroundColor: getPOIColor('groceries') }" />
-                        <span class="text-highlighted">{{ grocery.name }}</span>
-                      </div>
+                      <span class="text-highlighted">{{ grocery.name }}</span>
                       <span v-if="grocery.distance_m" class="text-muted">{{ formatDistanceInFeet(grocery.distance_m) }}</span>
                     </div>
                   </div>
@@ -306,12 +281,9 @@
                     <div
                       v-for="(park, idx) in osmData.highlights.parks.slice(0, 10)"
                       :key="idx"
-                      class="flex items-center justify-between text-xs py-1"
+                      class="flex items-center justify-between text-xs py-1 px-2"
                     >
-                      <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full flex-shrink-0" :style="{ backgroundColor: getPOIColor('parks') }" />
-                        <span class="text-highlighted">{{ park.name }}</span>
-                      </div>
+                      <span class="text-highlighted">{{ park.name }}</span>
                       <span v-if="park.distance_m" class="text-muted">{{ formatDistanceInFeet(park.distance_m) }}</span>
                     </div>
                   </div>
@@ -322,12 +294,9 @@
                     <div
                       v-for="(church, idx) in osmData.highlights.churches.slice(0, 10)"
                       :key="idx"
-                      class="flex items-center justify-between text-xs py-1"
+                      class="flex items-center justify-between text-xs py-1 px-2"
                     >
-                      <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full flex-shrink-0" :style="{ backgroundColor: getPOIColor('churches') }" />
-                        <span class="text-highlighted">{{ church.name }}</span>
-                      </div>
+                      <span class="text-highlighted">{{ church.name }}</span>
                       <span v-if="church.distance_m" class="text-muted">{{ formatDistanceInFeet(church.distance_m) }}</span>
                     </div>
                   </div>
@@ -393,7 +362,7 @@ const amenityAccordionItems = computed(() => {
       slot: 'subway_stations',
       icon: 'i-lucide-train',
       defaultOpen: true,
-      content: `${props.osmData.highlights.subway_stations.length} stations nearby`,
+      count: props.osmData.highlights.subway_stations.length,
       color: getPOIColor('subway_stations')
     })
   }
@@ -404,7 +373,7 @@ const amenityAccordionItems = computed(() => {
       slot: 'bus_stops',
       icon: 'i-lucide-bus',
       defaultOpen: true,
-      content: `${props.osmData.highlights.bus_stops.length} stops nearby`,
+      count: props.osmData.highlights.bus_stops.length,
       color: getPOIColor('bus_stops')
     })
   }
@@ -415,7 +384,7 @@ const amenityAccordionItems = computed(() => {
       slot: 'schools',
       icon: 'i-lucide-school',
       defaultOpen: true,
-      content: `${props.osmData.highlights.schools.length} schools nearby`,
+      count: props.osmData.highlights.schools.length,
       color: getPOIColor('schools')
     })
   }
@@ -426,7 +395,7 @@ const amenityAccordionItems = computed(() => {
       slot: 'groceries',
       icon: 'i-lucide-shopping-cart',
       defaultOpen: true,
-      content: `${props.osmData.highlights.groceries.length} stores nearby`,
+      count: props.osmData.highlights.groceries.length,
       color: getPOIColor('groceries')
     })
   }
@@ -437,7 +406,7 @@ const amenityAccordionItems = computed(() => {
       slot: 'parks',
       icon: 'i-lucide-trees',
       defaultOpen: true,
-      content: `${props.osmData.highlights.parks.length} parks nearby`,
+      count: props.osmData.highlights.parks.length,
       color: getPOIColor('parks')
     })
   }
@@ -448,7 +417,7 @@ const amenityAccordionItems = computed(() => {
       slot: 'churches',
       icon: 'i-lucide-church',
       defaultOpen: true,
-      content: `${props.osmData.highlights.churches.length} places nearby`,
+      count: props.osmData.highlights.churches.length,
       color: getPOIColor('churches')
     })
   }

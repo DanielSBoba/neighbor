@@ -86,7 +86,7 @@ const locationStore = useLocationStore()
 // Use composable for slideover state
 const { isOpen: isSlideoverOpen } = useLocationSlideover()
 
-const cesiumViewerRef = ref<{ captureScreenshot: () => Promise<string> } | null>(null)
+const cesiumViewerRef = ref<{ captureScreenshot: () => Promise<string>, resetToHome: () => void } | null>(null)
 const streetViewRef = ref<{ captureScreenshot: () => Promise<string> } | null>(null)
 
 // Track Street View POV (Point of View)
@@ -112,6 +112,12 @@ const handleStreetViewPositionChange = (longitude: number, latitude: number) => 
 const handleStreetViewPovChange = (heading: number, pitch: number) => {
   streetViewHeading.value = heading
   streetViewPitch.value = pitch
+}
+
+const handleHomeReset = () => {
+  if (cesiumViewerRef.value?.resetToHome) {
+    cesiumViewerRef.value.resetToHome()
+  }
 }
 
 const analyzeBuilding = async () => {
@@ -190,12 +196,14 @@ useHead({
 onMounted(() => {
   if (process.client) {
     window.addEventListener('trigger-analyze', analyzeBuilding)
+    window.addEventListener('trigger-home-reset', handleHomeReset)
   }
 })
 
 onUnmounted(() => {
   if (process.client) {
     window.removeEventListener('trigger-analyze', analyzeBuilding)
+    window.removeEventListener('trigger-home-reset', handleHomeReset)
   }
 })
 </script>

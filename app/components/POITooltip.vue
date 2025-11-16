@@ -14,13 +14,8 @@
         class="fixed z-[9999] pointer-events-none"
       >
         <div class="relative">
-          <!-- Arrow pointing to marker -->
-          <div
-            class="absolute left-1/2 -translate-x-1/2 -bottom-2 w-4 h-4 bg-white dark:bg-gray-800 rotate-45 border-b border-r border-gray-200 dark:border-gray-700"
-          />
-          
           <!-- Tooltip content -->
-          <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 p-4 mb-2 min-w-[240px] max-w-[320px]">
+          <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 p-4 min-w-[240px] max-w-[320px]">
             <div class="flex items-start gap-3">
               <!-- Color indicator -->
               <div
